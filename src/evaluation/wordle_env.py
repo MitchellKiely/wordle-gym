@@ -108,28 +108,69 @@ class WordleEnv(gym.Env):
         self.prev_guess = 0
         return self.obs
     
-    def valid_action_mask(self):
+    def valid_action_mask(self, env):
         if self.prev_guess != 0:
             valid_words = []
 
             w_ext = []
             w_ext.extend(self._valid_words[self.prev_guess][0])
+            prev_guess_word = self._valid_words[self.prev_guess][0]
 
-            for i in range(len(self._valid_words)):
+            guess_arr = np.array(list(prev_guess_word))
+            solution_list = list(self.solution)
+            solution_arr = np.array(solution_list)
+
+            matched_bool = guess_arr == solution_arr
+            matched_letters = solution_arr[matched_bool]
+            matched_idx = np.where(matched_bool)[0]
+            idx_letters = dict(list(zip(matched_idx,matched_letters)))
+            partial_match_letters = []
+            for i, l in enumerate(prev_guess_word):
+                if l in solution_list:
+                    if (i,l) in idx_letters:
+                        continue
+                    else:
+                        partial_match_letters.append(l)
+                        solution_list.remove(l) # in case of multiple partial matches of letter
+
+            mask = []
+            for i, word in enumerate(self._valid_words):
+                if np.array(list(word[0]))[matched_bool]!=matched_letters:
+                    mask.append(False)
+                    continue
+                else:
+                    nonexact_matches = list(solution_arr[~matched_bool])
+                    for l in partial_match_letters:
+                        if l not in nonexact_matches:
+                            mask.append(False)
+                            continue
+                        else:
+                            nonexact_matches.remove(l)
+                breakpoint()
                 loop_ext = []
                 loop_ext.extend(self._valid_words[i][0])
                 tot_count = self.obs.tolist().count(5)
                 let_counter = 0
 
+                valid_flag = False
+                # THIS ALWAYS RETURNS FALSE
                 for j in range(len(self.obs)):
                     if self.obs[j] == 5:
                         if w_ext[j] == loop_ext[j]:
                             let_counter += 1
                             if let_counter == tot_count:
                                 valid_words.append(i)
-                self._valid_words = valid_words
+                                valid_flag = True
+                if valid_flag: 
+                    mask.append(True)
+                else:
+                    mask.append(False)
 
-            return len(valid_words)
+                #self._valid_words = valid_words
+            breakpoint()
+            return np.array(mask)
+        else:
+            return np.array([True]*len(self._valid_words))
         
     def render(self):
         pass

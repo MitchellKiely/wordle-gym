@@ -29,6 +29,7 @@ class RLagent():
             elif agent_type == "DQN":
                 self.model = DQN('MlpPolicy',env, tensorboard_log= "./tb_logs/", verbose=1, exploration_fraction = 0.90)
             elif agent_type == "MaskablePPO":
+                env = ActionMasker(env, env.valid_action_mask) 
                 self.model = MaskablePPO(MaskableActorCriticPolicy, env, tensorboard_log= "./tb_logs/", verbose=1)
             else:
                 raise Exception("Unknown Agent Type {}".format(agent_type))
