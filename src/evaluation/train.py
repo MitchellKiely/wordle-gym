@@ -24,7 +24,7 @@ if __name__ == "__main__":
     
     RL_algos = ["MaskablePPO"] #, "A2C", "DQN"]
 
-    timesteps = 10000
+    timesteps = 1000000
 
     steps = round(timesteps/1000000, 2)
     

@@ -125,33 +125,39 @@ class WordleEnv(gym.Env):
             matched_idx = np.where(matched_bool)[0]
             idx_letters = dict(list(zip(matched_idx,matched_letters)))
             partial_match_letters = []
+
+            for i, l in idx_letters.items():
+                if prev_guess_word[i] == l:
+                    solution_list.remove(l)
+
             for i, l in enumerate(prev_guess_word):
                 if l in solution_list:
-                    if (i,l) in idx_letters:
-                        continue
-                    else:
-                        partial_match_letters.append(l)
-                        solution_list.remove(l) # in case of multiple partial matches of letter
+                    partial_match_letters.append(l)
+                    solution_list.remove(l) # in case of multiple partial matches of letter
 
             mask = []
             for i, word in enumerate(self._valid_words):
-                if np.array(list(word[0]))[matched_bool]!=matched_letters:
+                if not np.all(np.array(list(word[0]))[matched_bool]==matched_letters):
                     mask.append(False)
                     continue
                 else:
                     nonexact_matches = list(solution_arr[~matched_bool])
+                    no_unmatched_letters = True
                     for l in partial_match_letters:
                         if l not in nonexact_matches:
-                            mask.append(False)
-                            continue
-                        else:
-                            nonexact_matches.remove(l)
-                breakpoint()
+                            no_unmatched_letters = False
+                            break
+                    if no_unmatched_letters:
+                        mask.append(True)
+                    else:
+                        mask.append(False)
+
+                '''
                 loop_ext = []
                 loop_ext.extend(self._valid_words[i][0])
                 tot_count = self.obs.tolist().count(5)
                 let_counter = 0
-
+                
                 valid_flag = False
                 # THIS ALWAYS RETURNS FALSE
                 for j in range(len(self.obs)):
@@ -165,9 +171,10 @@ class WordleEnv(gym.Env):
                     mask.append(True)
                 else:
                     mask.append(False)
+                '''
 
                 #self._valid_words = valid_words
-            breakpoint()
+            #breakpoint()
             return np.array(mask)
         else:
             return np.array([True]*len(self._valid_words))
