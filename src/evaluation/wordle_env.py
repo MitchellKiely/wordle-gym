@@ -102,7 +102,7 @@ class WordleEnv(gym.Env):
         self.solution_ct = Counter(self.solution)
         self.guess_no = 0
         self.guesses = []
-        self.obs = np.zeros((1+WORD_LENGTH,)).astype(np.int)
+        self.obs = np.zeros((1+WORD_LENGTH,)).astype(np.float64)
         self.guesses = []
         self.rewards = []
         self.prev_guess = 0
@@ -138,7 +138,7 @@ class WordleEnv(gym.Env):
             mask = []
             for i, word in enumerate(self._valid_words):
                 if not np.all(np.array(list(word[0]))[matched_bool]==matched_letters):
-                    mask.append(False)
+                    mask.append(0)
                     continue
                 else:
                     nonexact_matches = list(solution_arr[~matched_bool])
@@ -148,9 +148,9 @@ class WordleEnv(gym.Env):
                             no_unmatched_letters = False
                             break
                     if no_unmatched_letters:
-                        mask.append(True)
+                        mask.append(1)
                     else:
-                        mask.append(False)
+                        mask.append(0)
 
                 '''
                 loop_ext = []
@@ -177,7 +177,7 @@ class WordleEnv(gym.Env):
             #breakpoint()
             return np.array(mask)
         else:
-            return np.array([True]*len(self._valid_words))
+            return np.array([1]*len(self._valid_words))
         
     def render(self):
         pass

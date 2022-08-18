@@ -24,7 +24,7 @@ if __name__ == "__main__":
     
     RL_algos = ["MaskablePPO"] #, "A2C", "DQN"]
 
-    timesteps = 1000000
+    timesteps = 5000000
 
     steps = round(timesteps/1000000, 2)
     
@@ -36,6 +36,5 @@ if __name__ == "__main__":
         model = RLagent(env=env, agent_type = RL_algo)
 
         model.train(timesteps=int(timesteps), log_name =f"{RL_algo} training for {steps} million steps")
-
         model.save(f"{RL_algo} trained for {round(steps)}mill steps")
     
