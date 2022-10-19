@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 from stable_baselines3 import PPO, A2C, DQN, HER, DDPG, SAC, TD3, PPO
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common import results_plotter
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.results_plotter import load_results, ts2xy, plot_results
@@ -12,6 +12,7 @@ from stable_baselines3.common.noise import NormalActionNoise
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from sb3_contrib.common.wrappers import ActionMasker
 from sb3_contrib.ppo_mask import MaskablePPO
+from wordle_env import WordleEnv
 
 
 
@@ -37,7 +38,10 @@ class RLagent():
             self.load(agent_type, model_name)
 
     def train(self, timesteps,log_name, callback = None):
-      self.model.learn(timesteps, tb_log_name=log_name)
+        eval_callback = EvalCallback(WordleEnv(), best_model_save_path='trained_models/',
+                        log_path=log_name, eval_freq=1000,
+                        deterministic=True, render=False)
+        self.model.learn(timesteps, tb_log_name=log_name, callback=eval_callback)
 
     def get_action(self, observation, valid_actions=None):
 

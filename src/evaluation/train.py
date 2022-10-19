@@ -22,7 +22,7 @@ from rl import RLagent
 
 if __name__ == "__main__":
     
-    RL_algos = ["MaskablePPO"] #, "A2C", "DQN"]
+    RL_algos = ["PPO"] #, "A2C", "DQN"]
 
     timesteps = 5000000
 

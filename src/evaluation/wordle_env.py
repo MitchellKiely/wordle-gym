@@ -8,11 +8,31 @@ from gym.utils import seeding
 from enum import Enum
 from collections import Counter
 import numpy as np
+import random
+
+from Levenshtein import distance as levenshtein_distance
 
 WORD_LENGTH = 5
 allowed_guesses = 6
 SOLUTION_PATH = "words/solution_wordle.csv"
 VALID_WORDS_PATH = "words/guess_wordle.csv"
+
+
+max_green_matches = ['sauce', 'saucy', 'soapy', 'saute', 'sense', 'spree', 'gooey', 'scree', 'sooty', 'slate', 'saint', 'suite', 'slice', 'seize', 'sassy', 'puree', 'slimy', 'since', 'melee', 'sleet']
+max_green_letters = ['slate', 'sauce', 'slice', 'shale', 'saute', 'share', 'sooty', 'shine', 'suite', 'crane', 'saint', 'soapy', 'shone', 'shire', 'saucy', 'slave', 'cease', 'sense', 'saner', 'snare']
+max_green_yellow_letters = ['alert', 'alter', 'later', 'irate', 'arose', 'stare', 'arise', 'raise', 'learn', 'renal', 'saner', 'snare', 'cater', 'crate', 'react', 'trace', 'clear', 'least', 'slate', 'stale']
+min_levenshtein_words = ['slate', 'crane', 'shale', 'share', 'saner', 'saute', 'stale', 'slice', 'suite', 'crate', 'shine', 'stare', 'shone', 'scale', 'saint', 'cease', 'crone', 'shore', 'snare', 'scare']
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 class WordleEnv(gym.Env):
     metadata = {"render.modes": ["human"]}
@@ -33,154 +53,223 @@ class WordleEnv(gym.Env):
     def __init__(self):
         self._solutions = self._read_solutions()
         self._valid_words = self._get_valid_words()
-        self.action_space = spaces.Discrete(len(self._valid_words))
-        self.observation_space = spaces.Box(0,len(self._valid_words) , shape=(1+WORD_LENGTH,), dtype=np.int)
+        #self.action_space = spaces.Discrete(len(self._valid_words))
+        self.action_space = spaces.Discrete(6)
+        self.observation_space = spaces.Box(0,len(self._valid_words) , shape=(3,), dtype=np.int32)
         self.guess_no = 0
         self.prev_guess = 0
-
+        self.episode = 0
 
     def step(self, action):
-        """
-        action: index of word in valid_words
-
-        returns:
-            observation: (WORD_LENGTH + previous_action)
-            reward: +5 for every letter tin correct position, +1 for having a letter in the word, 
-                    0 for incorrect letters, +20 if guess is correct, -10 if guess is the same as last guess
-            done: True if game over, w/ or w/o correct answer
-            additional_info: empty
-        """
-        #Expends str into 5 letters
-        sol_lst = []
-        sol_lst.extend(self.solution)
-
-        #Turns selected word into 5 letters
-        act_lst = []
-        act_lst.extend(self._valid_words[action][0])
-        self.guesses.append(self._valid_words[action][0])
-        #Reinstatiates word each round
-        reward=0
-
-        #penalises for guessing the same word
-        if action is self.prev_guess:
-            reward -= 10
-
-        #Appends current guess into a list
-        self.prev_guess = action
-        
-        #Calculates Rewards
-        for i in range(WORD_LENGTH):
-            if act_lst[i] == sol_lst[i]:
-                self.obs[i]=5
-                reward += 5
-            elif act_lst[i] in sol_lst:
-                self.obs[i]=1
-                reward +=1
+        if action == 0:
+            guess = self._valid_words[np.random.randint(len(self._valid_words))][0]
+            while guess in self.guesses:
+                guess = self._valid_words[np.random.randint(len(self._valid_words))][0]
+        elif action == 1:
+            guess = random.choice(max_green_matches)
+            while guess in self.guesses:
+                guess = random.choice(max_green_matches)
+        elif action == 2:
+            guess = random.choice(max_green_letters)
+            while guess in self.guesses:
+                guess = random.choice(max_green_letters)
+        elif action == 3:
+            guess = random.choice(max_green_yellow_letters)
+            while guess in self.guesses:
+                guess = random.choice(max_green_yellow_letters)
+        elif action == 4:
+            guess = random.choice(min_levenshtein_words)
+            while guess in self.guesses:
+                guess = random.choice(min_levenshtein_words)
+        elif action == 5:
+            guess = random.choice(self.possible_words())[0]
+        #print(f"Guess: {guess}")
+        if tuple(self.obs[:2]) in self.action_dist:
+            if action in self.action_dist[tuple(self.obs[:2])]:
+                self.action_dist[tuple(self.obs[:2])][action] += 1
             else:
-                self.obs[i]=0
-        
-        self.obs[5] = action
-        #Increments counter
-        self.guess_no +=1
-
-        #Checks to see if guessed action is equal to soltuon
-        if self._valid_words[action][0] == self.solution:
-            done = True
-            reward += 25
+                self.action_dist[tuple(self.obs[:2])][action] = 1
         else:
-            done=False
-        self.rewards.append(reward)
+            self.action_dist[tuple(self.obs[:2])] = {action: 1}
 
-        #Max number of guess is 6
-        if self.guess_no >= allowed_guesses:
-            done=True
-
-        return self.obs, reward, done, {}
+        done = False
+        reward = -1
+        yellow_added_this_step = []
+        if guess == self.solution:
+            done = True
+            reward = 10
+            self.obs = [5, 0, 0]
+            self.greens = dict(zip(range(WORD_LENGTH), list(self.solution)))
+        else:
+            guess_l = list(guess)
+            sol_l = list(self.solution)
+            for i in range(WORD_LENGTH):
+                if guess_l[i] == sol_l[i]:
+                    #reward += 5
+                    self.greens[i] = guess_l[i]
+                elif guess_l[i] in sol_l:
+                    if guess_l[i] in yellow_added_this_step: continue
+                    indices = [j for j, x in enumerate(sol_l) if x == guess_l[i]]
+                    accounted_for = True
+                    for idx in indices:
+                        if sol_l[idx] != guess_l[idx]:
+                            accounted_for = False
+                    if not accounted_for:
+                        if guess_l[i] in self.yellows:
+                            self.yellows[guess_l[i]].append(i)
+                        else:
+                            self.yellows[guess_l[i]] = [i]
+                        if len(indices) == len(self.yellows[guess_l[i]]):
+                            yellow_added_this_step.append(guess_l[i])
+                    #reward +=1 
+                else:
+                    self.greys.append(guess_l[i])
+            self.obs = [len(self.greens), sum([len(v) for v in self.yellows.values()]), len(self.greys)]
+        
+        #print(f"Greens: {self.greens}")
+        #print(f"Yellow: {self.yellows}")
+        #print(f"Greys: {self.greys}\n")
+        self.guess_no += 1
+        self.guesses.append(guess)
+        if self.guess_no == 20:
+            done = True
+        if self.episode % 20 == 0:
+            self.render()
+        return self.obs, reward, done, {} 
 
     def reset(self):
         self.solution = self._solutions[np.random.randint(len(self._solutions))]
         self.solution_ct = Counter(self.solution)
         self.guess_no = 0
         self.guesses = []
-        self.obs = np.zeros((1+WORD_LENGTH,)).astype(np.float64)
+        self.obs = np.zeros(3).astype(np.float64)
         self.guesses = []
         self.rewards = []
         self.prev_guess = 0
+        self.greens = {}
+        self.yellows = {}
+        self.greys = []
+        if self.episode % 20 == 0:
+            print(f"\nEpisode: {self.episode}")
+        
+        if self.episode != 0:
+            if ((self.episode < 5000 and self.episode % 500 == 0) or 
+            (self.episode >= 5000 and self.episode % 50000 == 0)):
+                with open("action_distribution.txt", "a") as f:
+                    f.write(f"Episode: {self.episode}\n")
+                    f.write(f"{self.action_dist}\n")
+                self.action_dist = {}
+        else:
+            self.action_dist = {}
+
+        self.episode += 1
         return self.obs
     
-    def valid_action_mask(self, env):
-        if self.prev_guess != 0:
-            valid_words = []
-
-            w_ext = []
-            w_ext.extend(self._valid_words[self.prev_guess][0])
-            prev_guess_word = self._valid_words[self.prev_guess][0]
-
-            guess_arr = np.array(list(prev_guess_word))
-            solution_list = list(self.solution)
-            solution_arr = np.array(solution_list)
-
-            matched_bool = guess_arr == solution_arr
-            matched_letters = solution_arr[matched_bool]
-            matched_idx = np.where(matched_bool)[0]
-            idx_letters = dict(list(zip(matched_idx,matched_letters)))
-            partial_match_letters = []
-
-            for i, l in idx_letters.items():
-                if prev_guess_word[i] == l:
-                    solution_list.remove(l)
-
-            for i, l in enumerate(prev_guess_word):
-                if l in solution_list:
-                    partial_match_letters.append(l)
-                    solution_list.remove(l) # in case of multiple partial matches of letter
-
-            mask = []
-            for i, word in enumerate(self._valid_words):
-                if not np.all(np.array(list(word[0]))[matched_bool]==matched_letters):
-                    mask.append(0)
-                    continue
-                else:
-                    nonexact_matches = list(solution_arr[~matched_bool])
-                    no_unmatched_letters = True
-                    for l in partial_match_letters:
-                        if l not in nonexact_matches:
-                            no_unmatched_letters = False
-                            break
-                    if no_unmatched_letters:
-                        mask.append(1)
-                    else:
-                        mask.append(0)
-
-                '''
-                loop_ext = []
-                loop_ext.extend(self._valid_words[i][0])
-                tot_count = self.obs.tolist().count(5)
-                let_counter = 0
-                
-                valid_flag = False
-                # THIS ALWAYS RETURNS FALSE
-                for j in range(len(self.obs)):
-                    if self.obs[j] == 5:
-                        if w_ext[j] == loop_ext[j]:
-                            let_counter += 1
-                            if let_counter == tot_count:
-                                valid_words.append(i)
-                                valid_flag = True
-                if valid_flag: 
-                    mask.append(True)
-                else:
-                    mask.append(False)
-                '''
-
-                #self._valid_words = valid_words
-            #breakpoint()
-            return np.array(mask)
-        else:
-            return np.array([1]*len(self._valid_words))
+    def possible_words(self):
+        possible_words = []
+        for i, word in enumerate(self._valid_words):
+            if word[0] in self.guesses:
+                continue
+            word_l = list(word[0])
+            green_idxs = self.greens.keys()
+            possible_flag = True
+            for i, letter in enumerate(word_l):
+                if i in green_idxs and self.greens[i] != letter:
+                    possible_flag = False
+                    break
+                elif letter in self.greys:
+                    possible_flag = False
+                    break
+            if not possible_flag: continue
+            
+            for yellow, yellow_not_idxs in self.yellows.items():
+                if yellow not in word_l:
+                    possible_flag = False
+                    break
+                elif yellow in word_l:
+                    indices = [j for j, x in enumerate(word_l) if x == yellow]
+                    if np.all(indices==yellow_not_idxs):
+                        possible_flag = False
+                        break
+            if possible_flag:
+                possible_words.append(word)
+        return possible_words
         
     def render(self):
-        pass
+        yellow_letters = []
+        for v in self.yellows.values():
+            yellow_letters.extend(v)
+        for i, letter in enumerate(self.guesses[-1]):
+            if i in self.greens and self.greens[i] == letter:
+                print(bcolors.OKGREEN+f"{letter}"+bcolors.ENDC, end="")
+            elif letter in self.yellows and i in self.yellows[letter]:
+                print(bcolors.WARNING+f"{letter}"+bcolors.ENDC, end="")
+            else:
+                print(letter, end="")
+        print()
 
     def close(self):
         pass
+
+
+def get_levenshtein_distance():
+    levenshteins = {}
+    for i, word in enumerate(env._valid_words):
+        word = word[0]
+        print(f"{i}/{len(env._valid_words)}")
+        for guess_word in env._valid_words:
+            guess_word = guess_word[0]
+            levenshteins[guess_word] = levenshteins.get(guess_word, 0) + levenshtein_distance(guess_word, word)
+    min_lev_words = sorted(list(zip(levenshteins.keys(), levenshteins.values())), key=lambda k: k[1])
+    print(min_lev_words[:20])
+
+def get_all_shared():
+    shared_letters = {}
+    for i, word in enumerate(env._valid_words):
+        print(f"{i}/{len(env._valid_words)}")
+        for guess_word in env._valid_words:
+            overlap = list((word[1] & guess_word[1]).elements())
+            shared_letters[guess_word[0]] = shared_letters.get(guess_word[0], 0) + len(overlap)
+    max_match_words = sorted(list(zip(shared_letters.keys(), shared_letters.values())), key=lambda k: k[1], reverse=True)    
+    print(max_match_words[:20])
+
+def get_max_greens():
+    greens = {}
+    greens_letters = {}
+    for i, word in enumerate(env._valid_words):
+        word = word[0]
+        print(f"{i}/{len(env._valid_words)}")
+        for j, guess_word in enumerate(env._valid_words):
+            guess_word = guess_word[0]
+            if word == guess_word: continue
+            word_l = list(word)
+            guess_word_l = list(guess_word)
+            greens_sum = sum(np.array(word_l)==np.array(guess_word_l))
+            if greens_sum > 0:
+                greens[guess_word] = greens.get(guess_word, 0)+1
+            greens_letters[guess_word] = greens_letters.get(guess_word, 0)+greens_sum
+
+    max_match_words = sorted(list(zip(greens.keys(), greens.values())), key=lambda k: k[1], reverse=True)
+    max_match_letters = sorted(list(zip(greens_letters.keys(), greens_letters.values())), key=lambda k: k[1], reverse=True)
+
+    print(max_match_words[:20])
+    print(max_match_letters[:20])
+'''
+if __name__ == "__main__":
+    env = WordleEnv()
+    print(len(env._valid_words))
+    #max_green_matches = [('sauce', 1122), ('saucy', 1115), ('soapy', 1114), ('saute', 1104), ('sense', 1100), ('spree', 1099), ('gooey', 1098), ('scree', 1097), ('sooty', 1095), ('slate', 1077), ('saint', 1077), ('suite', 1075), ('slice', 1069), ('seize', 1061), ('sassy', 1057), ('puree', 1048), ('slimy', 1043), ('since', 1042), ('melee', 1039), ('sleet', 1037)]
+    #max_green_letters = [('slate', 1432), ('sauce', 1406), ('slice', 1404), ('shale', 1398), ('saute', 1393), ('share', 1388), ('sooty', 1387), ('shine', 1377), ('suite', 1376), ('crane', 1373), ('saint', 1366), ('soapy', 1361), ('shone', 1355), ('shire', 1347), ('saucy', 1346), ('slave', 1339), ('cease', 1337), ('sense', 1337), ('saner', 1334), ('snare', 1331)]
+    #max_green_yellow_letters = [('alert', 4117), ('alter', 4117), ('later', 4117), ('irate', 4116), ('arose', 4093), ('stare', 4087), ('arise', 4067), ('raise', 4067), ('learn', 4000), ('renal', 4000), ('saner', 3970), ('snare', 3970), ('cater', 3917), ('crate', 3917), ('react', 3917), ('trace', 3917), ('clear', 3898), ('least', 3898), ('slate', 3898), ('stale', 3898)]
+    #min_levenshtein_words = [('slate', 9972), ('crane', 10002), ('shale', 10004), ('share', 10032), ('saner', 10035), ('saute', 10043), ('stale', 10044), ('slice', 10045), ('suite', 10045), ('crate', 10047), ('shine', 10052), ('stare', 10060), ('shone', 10069), ('scale', 10070), ('saint', 10073), ('cease', 10080), ('crone', 10082), ('shore', 10083), ('snare', 10087), ('scare', 10091)]
+    for ep in range(10):
+        print(f"Episode: {ep}")
+        env.reset()
+        done = False
+        reward_total = 0
+        while not done:
+            obs, reward, done = env.step(5)
+            env.render()
+            reward_total += reward
+        print(f"Total Reward: {reward_total}, Num guesses: {env.guess_no}\n")
+'''
