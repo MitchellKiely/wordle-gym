@@ -50,40 +50,63 @@ class WordleEnv(gym.Env):
         return words
 
 
-    def __init__(self):
+    def __init__(self, action_space):
         self._solutions = self._read_solutions()
         self._valid_words = self._get_valid_words()
         #self.action_space = spaces.Discrete(len(self._valid_words))
-        self.action_space = spaces.Discrete(6)
-        self.observation_space = spaces.Box(0,len(self._valid_words) , shape=(3,), dtype=np.int32)
+        self.action_space = action_space
+        if isinstance(self.action_space, spaces.MultiDiscrete):
+            self.observation_space = spaces.Box(0,len(self._valid_words), shape=(13,), dtype=np.int32)
+        else:
+            self.observation_space = spaces.Box(0,len(self._valid_words), shape=(3,), dtype=np.int32)
         self.guess_no = 0
         self.prev_guess = 0
         self.episode = 0
 
     def step(self, action):
+        if isinstance(self.action_space, spaces.MultiDiscrete):
+            multidisc = True
+            action, choice = action
+        else:
+            multidisc = False
         if action == 0:
-            guess = self._valid_words[np.random.randint(len(self._valid_words))][0]
-            while guess in self.guesses:
+            if multidisc:
+                guess = self._valid_words[choice][0]
+            else:
                 guess = self._valid_words[np.random.randint(len(self._valid_words))][0]
+                while guess in self.guesses:
+                    guess = self._valid_words[np.random.randint(len(self._valid_words))][0]
         elif action == 1:
-            guess = random.choice(max_green_matches)
-            while guess in self.guesses:
+            if multidisc:
+                guess = max_green_matches[choice]
+            else:
                 guess = random.choice(max_green_matches)
+                while guess in self.guesses:
+                    guess = random.choice(max_green_matches)
         elif action == 2:
-            guess = random.choice(max_green_letters)
-            while guess in self.guesses:
+            if multidisc:
+                guess = max_green_letters[choice]
+            else:
                 guess = random.choice(max_green_letters)
+                while guess in self.guesses:
+                    guess = random.choice(max_green_letters)
         elif action == 3:
-            guess = random.choice(max_green_yellow_letters)
-            while guess in self.guesses:
+            if multidisc:
+                guess = max_green_yellow_letters[choice]
+            else:
                 guess = random.choice(max_green_yellow_letters)
+                while guess in self.guesses:
+                    guess = random.choice(max_green_yellow_letters)
         elif action == 4:
-            guess = random.choice(min_levenshtein_words)
-            while guess in self.guesses:
+            if multidisc:
+                guess = min_levenshtein_words[choice]
+            else:
                 guess = random.choice(min_levenshtein_words)
+                while guess in self.guesses:
+                    guess = random.choice(min_levenshtein_words)
         elif action == 5:
             guess = random.choice(self.possible_words())[0]
-        #print(f"Guess: {guess}")
+
         if tuple(self.obs[:2]) in self.action_dist:
             if action in self.action_dist[tuple(self.obs[:2])]:
                 self.action_dist[tuple(self.obs[:2])][action] += 1
@@ -98,40 +121,50 @@ class WordleEnv(gym.Env):
         if guess == self.solution:
             done = True
             reward = 10
-            self.obs = [5, 0, 0]
+            if isinstance(self.action_space, spaces.MultiDiscrete):
+                self.obs = [5,0,0]+self.obs[3:]
+                self.obs[self.guess_no] = self._solutions.index(guess)
+            else:
+                self.obs = [5, 0, 0]
             self.greens = dict(zip(range(WORD_LENGTH), list(self.solution)))
         else:
-            guess_l = list(guess)
-            sol_l = list(self.solution)
-            for i in range(WORD_LENGTH):
-                if guess_l[i] == sol_l[i]:
-                    #reward += 5
-                    self.greens[i] = guess_l[i]
-                elif guess_l[i] in sol_l:
-                    if guess_l[i] in yellow_added_this_step: continue
-                    indices = [j for j, x in enumerate(sol_l) if x == guess_l[i]]
-                    accounted_for = True
-                    for idx in indices:
-                        if sol_l[idx] != guess_l[idx]:
-                            accounted_for = False
-                    if not accounted_for:
-                        if guess_l[i] in self.yellows:
-                            self.yellows[guess_l[i]].append(i)
-                        else:
-                            self.yellows[guess_l[i]] = [i]
-                        if len(indices) == len(self.yellows[guess_l[i]]):
-                            yellow_added_this_step.append(guess_l[i])
-                    #reward +=1 
-                else:
-                    self.greys.append(guess_l[i])
-            self.obs = [len(self.greens), sum([len(v) for v in self.yellows.values()]), len(self.greys)]
-        
+            if guess in self.guesses:
+                reward = -5
+            else:
+                guess_l = list(guess)
+                sol_l = list(self.solution)
+                for i in range(WORD_LENGTH):
+                    if guess_l[i] == sol_l[i]:
+                        #reward += 5
+                        self.greens[i] = guess_l[i]
+                    elif guess_l[i] in sol_l:
+                        if guess_l[i] in yellow_added_this_step: continue
+                        indices = [j for j, x in enumerate(sol_l) if x == guess_l[i]]
+                        accounted_for = True
+                        for idx in indices:
+                            if sol_l[idx] != guess_l[idx]:
+                                accounted_for = False
+                        if not accounted_for:
+                            if guess_l[i] in self.yellows:
+                                self.yellows[guess_l[i]].append(i)
+                            else:
+                                self.yellows[guess_l[i]] = [i]
+                            if len(indices) == len(self.yellows[guess_l[i]]):
+                                yellow_added_this_step.append(guess_l[i])
+                        #reward +=1 
+                    else:
+                        self.greys.append(guess_l[i])
+            if isinstance(self.action_space, spaces.MultiDiscrete):
+                self.obs = [len(self.greens), sum([len(v) for v in self.yellows.values()]), len(self.greys)]+self.obs[3:]
+                self.obs[3+self.guess_no] = self._solutions.index(guess)
+            else:
+                self.obs = [len(self.greens), sum([len(v) for v in self.yellows.values()]), len(self.greys)]
         #print(f"Greens: {self.greens}")
         #print(f"Yellow: {self.yellows}")
         #print(f"Greys: {self.greys}\n")
         self.guess_no += 1
         self.guesses.append(guess)
-        if self.guess_no == 20:
+        if self.guess_no == 10:
             done = True
         if self.episode % 20 == 0:
             self.render()
@@ -142,7 +175,10 @@ class WordleEnv(gym.Env):
         self.solution_ct = Counter(self.solution)
         self.guess_no = 0
         self.guesses = []
-        self.obs = np.zeros(3).astype(np.float64)
+        if isinstance(self.action_space, spaces.MultiDiscrete):
+            self.obs = [0,0,0,-1,-1,-1,-1,-1,-1, -1, -1, -1, -1]
+        else:
+            self.obs = [0,0,0]
         self.guesses = []
         self.rewards = []
         self.prev_guess = 0
@@ -151,7 +187,7 @@ class WordleEnv(gym.Env):
         self.greys = []
         if self.episode % 20 == 0:
             print(f"\nEpisode: {self.episode}")
-        
+        '''
         if self.episode != 0:
             if ((self.episode < 5000 and self.episode % 500 == 0) or 
             (self.episode >= 5000 and self.episode % 50000 == 0)):
@@ -161,7 +197,8 @@ class WordleEnv(gym.Env):
                 self.action_dist = {}
         else:
             self.action_dist = {}
-
+        '''
+        self.action_dist = {}
         self.episode += 1
         return self.obs
     
@@ -254,10 +291,11 @@ def get_max_greens():
 
     print(max_match_words[:20])
     print(max_match_letters[:20])
+
 '''
 if __name__ == "__main__":
-    env = WordleEnv()
-    print(len(env._valid_words))
+    action_space = spaces.MultiDiscrete((6,20))
+    env = WordleEnv(action_space)
     #max_green_matches = [('sauce', 1122), ('saucy', 1115), ('soapy', 1114), ('saute', 1104), ('sense', 1100), ('spree', 1099), ('gooey', 1098), ('scree', 1097), ('sooty', 1095), ('slate', 1077), ('saint', 1077), ('suite', 1075), ('slice', 1069), ('seize', 1061), ('sassy', 1057), ('puree', 1048), ('slimy', 1043), ('since', 1042), ('melee', 1039), ('sleet', 1037)]
     #max_green_letters = [('slate', 1432), ('sauce', 1406), ('slice', 1404), ('shale', 1398), ('saute', 1393), ('share', 1388), ('sooty', 1387), ('shine', 1377), ('suite', 1376), ('crane', 1373), ('saint', 1366), ('soapy', 1361), ('shone', 1355), ('shire', 1347), ('saucy', 1346), ('slave', 1339), ('cease', 1337), ('sense', 1337), ('saner', 1334), ('snare', 1331)]
     #max_green_yellow_letters = [('alert', 4117), ('alter', 4117), ('later', 4117), ('irate', 4116), ('arose', 4093), ('stare', 4087), ('arise', 4067), ('raise', 4067), ('learn', 4000), ('renal', 4000), ('saner', 3970), ('snare', 3970), ('cater', 3917), ('crate', 3917), ('react', 3917), ('trace', 3917), ('clear', 3898), ('least', 3898), ('slate', 3898), ('stale', 3898)]
@@ -268,7 +306,8 @@ if __name__ == "__main__":
         done = False
         reward_total = 0
         while not done:
-            obs, reward, done = env.step(5)
+            obs, reward, done, _ = env.step(action_space.sample())
+            print(obs)
             env.render()
             reward_total += reward
         print(f"Total Reward: {reward_total}, Num guesses: {env.guess_no}\n")

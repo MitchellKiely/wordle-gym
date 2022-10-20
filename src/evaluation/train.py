@@ -5,6 +5,7 @@ import numpy as np
 import os
 import gym
 import sys
+from gym.spaces import Discrete, MultiDiscrete
 
 from stable_baselines3 import PPO, A2C, DQN
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, CheckpointCallback, EveryNTimesteps
@@ -31,10 +32,11 @@ if __name__ == "__main__":
 
     for RL_algo in RL_algos:
 
-        env = WordleEnv()
+        env = WordleEnv(MultiDiscrete((6, 20)))
+        eval_env = WordleEnv(MultiDiscrete((6, 20)))
 
         model = RLagent(env=env, agent_type = RL_algo)
 
-        model.train(timesteps=int(timesteps), log_name =f"{RL_algo} training for {steps} million steps")
+        model.train(timesteps=int(timesteps), log_name =f"{RL_algo} training for {steps} million steps", eval_env = eval_env)
         model.save(f"{RL_algo} trained for {round(steps)}mill steps")
     
