@@ -44,6 +44,7 @@ class RLagent():
         self.model.learn(timesteps, tb_log_name=log_name, callback=eval_callback)
 
     def run_trained_model(self, env, num_episodes=10):
+        ep_lens = []
         for ep in range(num_episodes):
             print(f"Episode: {ep}")
             obs = env.reset()
@@ -53,8 +54,10 @@ class RLagent():
                 obs, reward, done, _ = env.step(self.get_action(obs))
                 env.render()
                 reward_total += reward
+            ep_lens.append(env.guess_no)
             print(f"Total Reward: {reward_total}, Num guesses: {env.guess_no}\n")
-
+        print(env.choices)
+        print(f"{np.mean(ep_lens)}+\-{np.std(ep_lens)}")
     def get_action(self, observation, valid_actions=None):
 
         if self.agent_type == "DQN":

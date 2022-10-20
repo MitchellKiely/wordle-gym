@@ -63,11 +63,15 @@ class WordleEnv(gym.Env):
         self.guess_no = 0
         self.prev_guess = 0
         self.episode = 0
+        self.choices = []
 
     def step(self, action):
         if isinstance(self.action_space, spaces.MultiDiscrete):
             multidisc = True
-            action, choice = action
+            action, choice = action[0]
+            if action == 4:
+                if min_levenshtein_words[choice] not in self.choices:
+                    self.choices.append(min_levenshtein_words[choice])
         else:
             multidisc = False
             action, choice = action
@@ -190,7 +194,7 @@ class WordleEnv(gym.Env):
         self.greys = []
         if self.episode % 20 == 0:
             print(f"\nEpisode: {self.episode}")
-        
+        '''
         if self.episode != 0:
             if ((self.episode < 5000 and self.episode % 500 == 0) or 
             (self.episode >= 5000 and self.episode % 50000 == 0)):
@@ -198,10 +202,10 @@ class WordleEnv(gym.Env):
                     f.write(f"Episode: {self.episode}\n")
                     f.write(f"{self.action_dist}\n")
                 self.action_dist = {}
-        else:
+        '''
+        if self.episode == 0:
             self.action_dist = {}
         
-        self.action_dist = {}
         self.episode += 1
         return self.obs
     
