@@ -43,6 +43,18 @@ class RLagent():
                         deterministic=True, render=False)
         self.model.learn(timesteps, tb_log_name=log_name, callback=eval_callback)
 
+    def run_trained_model(self, env, num_episodes=10):
+        for ep in range(num_episodes):
+            print(f"Episode: {ep}")
+            obs = env.reset()
+            done = False
+            reward_total = 0
+            while not done:
+                obs, reward, done = env.step(self.get_action(obs))
+                env.render()
+                reward_total += reward
+            print(f"Total Reward: {reward_total}, Num guesses: {env.guess_no}\n")
+
     def get_action(self, observation, valid_actions=None):
 
         if self.agent_type == "DQN":

@@ -138,7 +138,8 @@ class WordleEnv(gym.Env):
         return self.obs, reward, done, {} 
 
     def reset(self):
-        self.solution = self._solutions[np.random.randint(len(self._solutions))]
+        #self.solution = self._solutions[np.random.randint(len(self._solutions))]
+        self.solution = "denim"
         self.solution_ct = Counter(self.solution)
         self.guess_no = 0
         self.guesses = []
