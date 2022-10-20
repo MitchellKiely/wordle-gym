@@ -52,6 +52,7 @@ class WordleEnv(gym.Env):
 
     def __init__(self, action_space):
         self._solutions = self._read_solutions()
+        print(len(self._solutions))
         self._valid_words = self._get_valid_words()
         #self.action_space = spaces.Discrete(len(self._valid_words))
         self.action_space = action_space
@@ -69,6 +70,7 @@ class WordleEnv(gym.Env):
             action, choice = action
         else:
             multidisc = False
+            action, choice = action
         if action == 0:
             if multidisc:
                 guess = self._valid_words[choice][0]
@@ -171,8 +173,8 @@ class WordleEnv(gym.Env):
         return self.obs, reward, done, {} 
 
     def reset(self):
-        #self.solution = self._solutions[np.random.randint(len(self._solutions))]
-        self.solution = "denim"
+        self.solution = self._solutions[np.random.randint(len(self._solutions))]
+        #self.solution = "denim"
         self.solution_ct = Counter(self.solution)
         self.guess_no = 0
         self.guesses = []
@@ -188,7 +190,7 @@ class WordleEnv(gym.Env):
         self.greys = []
         if self.episode % 20 == 0:
             print(f"\nEpisode: {self.episode}")
-        '''
+        
         if self.episode != 0:
             if ((self.episode < 5000 and self.episode % 500 == 0) or 
             (self.episode >= 5000 and self.episode % 50000 == 0)):
@@ -198,7 +200,7 @@ class WordleEnv(gym.Env):
                 self.action_dist = {}
         else:
             self.action_dist = {}
-        '''
+        
         self.action_dist = {}
         self.episode += 1
         return self.obs

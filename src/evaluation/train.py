@@ -33,10 +33,12 @@ if __name__ == "__main__":
     for RL_algo in RL_algos:
 
         env = WordleEnv(MultiDiscrete((6, 20)))
-        eval_env = WordleEnv(MultiDiscrete((6, 20)))
-
-        agent = RLagent(env=env, agent_type = RL_algo, model_name="trained_models/best_model_PPO training for 5.0 million steps_14.zip")
-        agent.run_trained_model(env, num_episodes=1)
+        #eval_env = WordleEnv(MultiDiscrete((6, 20)))
+        #env = WordleEnv(Discrete(6))
+        agent = RLagent(env=env, agent_type = RL_algo, model_name="trained_models/best_model.zip")
+        
+        
+        agent.run_trained_model(env, num_episodes=5000)
         #model.train(timesteps=int(timesteps), log_name =f"{RL_algo} training for {steps} million steps")
         #model.save(f"{RL_algo} trained for {round(steps)}mill steps")
   

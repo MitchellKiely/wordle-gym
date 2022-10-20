@@ -50,7 +50,7 @@ class RLagent():
             done = False
             reward_total = 0
             while not done:
-                obs, reward, done = env.step(self.get_action(obs))
+                obs, reward, done, _ = env.step(self.get_action(obs))
                 env.render()
                 reward_total += reward
             print(f"Total Reward: {reward_total}, Num guesses: {env.guess_no}\n")
